@@ -32,13 +32,14 @@ AWS.config.update({
     
         dockerStart.on('close', (code) => {
             if (code === 0) {
+                const dockerUpdate = spawn('docker', ['update', '--memory', '100m', '--cpus', '1', id]);
                 console.log('Docker container started');
                 callback(null, 'Docker container started');
             }
         });
     }
     
-    function executeDockerAndDelete(id, res ) {
+    function executeDockerAndDelete(id, res,req) {
      
         exec(`docker cp ./code.c ${id}:/usr/src/app`, (err, stdout, stderr) => {
             if (err) {
@@ -89,13 +90,14 @@ AWS.config.update({
                     const s3 = new AWS.S3();
                     const params = {
                         Bucket: 'codeplayground',
-                        Key: `${id}_${id}.c`,
+                        Key: `${req.body.email}/${req.body.fname}.c`,
                         Body: fs.createReadStream('./code.c')
                     };
                     s3.upload(params, (err, data) => {
                         if (err) {
                             console.log('Error uploading file:', err);
                         } else {
+                            
                             console.log('File uploaded successfully. File location:', data.Location);
                             fs.unlink('code.c', (err) => {
                                 if (err) {
@@ -103,6 +105,7 @@ AWS.config.update({
                                     return;
                                 }
                                 console.log('code.c deleted successfully');
+                                
                             });
                         }
                     });
@@ -144,19 +147,40 @@ app.post('/compile', function (req, res){
         }
 
         
-           
+          
         
 
        
-        executeDockerAndDelete(id, res )
+        executeDockerAndDelete(id, res ,req )
 
        })
       
        
 })
 })
-    
 
+    
+app.get("/getCode",function(req,res){
+
+    const s3 = new AWS.S3();
+    const params = {
+        Bucket: 'codeplayground',
+        Prefix: `${req.body.email}/` // Assuming email is used as the folder name
+    };
+
+    s3.listObjectsV2(params, (err, data) => {
+        if (err) {
+            console.log('Error fetching file list:', err);
+            res.status(500).send({ error: 'Error fetching file list', details: err });
+        } else {
+            // Extract the file names from the data
+            const fileNames = data.Contents.map(file => file.Key);
+            console.log('File names:', fileNames);
+            res.status(200).send({ files: fileNames });
+        }
+    });
+
+})
 app.listen(8000,()=>{
 console.log('listening on 8000')
 })
