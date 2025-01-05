@@ -15,6 +15,11 @@ const app = express()
 app.use(cors())
 
 app.use(body_parser.urlencoded({ extended: true }))
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 AWS.config.update({
     region: process.env.Region,
     accessKeyId: process.env.accessKeyId,
@@ -39,41 +44,52 @@ AWS.config.update({
         });
     }
     
-    function executeDockerAndDelete(id, res,req) {
-     
-        exec(`docker cp ./code.c ${id}:/usr/src/app`, (err, stdout, stderr) => {
+    function executeDockerAndDelete(id, res, req) {
+        let codeFile = '';
+        let dockerExecCmd = '';
+        const lang = req.body.lang;
+    
+        if (lang === 'c') {
+            codeFile = `code.c`;
+            dockerExecCmd = `docker exec ${id} sh -c "gcc -o code code.c && ./code"`;
+        } else if (lang === 'py') {
+            codeFile = `code.py`;
+            dockerExecCmd = `docker exec ${id} python3 /usr/src/app/code.py`;
+        } else if (lang === 'js') {
+            codeFile = `code.js`;
+            dockerExecCmd = `docker exec ${id} node /usr/src/app/code.js`;
+        } else {
+            res.status(400).send({ error: 'Unsupported language' });
+            return;
+        }
+    
+        exec(`docker cp ./${codeFile} ${id}:/usr/src/app`, (err, stdout, stderr) => {
             if (err) {
                 console.error('Error copying code file:', err);
                 res.status(500).send({ error: 'Error starting Docker container', details: err });
                 return;
             }
             console.log('Code file copied successfully');
-        
+    
             // Start Docker container
             startDocker(id, (error, message) => {
                 if (error) {
                     res.status(500).send({ error: 'Error starting Docker container', details: error });
                     return;
                 }
-        
+    
                 // Execute commands in Docker container
-                const dockerExecCmd = `docker exec ${id} sh -c "gcc -o code code.c && ./code"`;
-                // if (process.platform === 'win32') {
-                //     // Prefix the command with 'winpty' for Windows platforms
-                //     dockerExecCmd = `winpty ${dockerExecCmd}`;
-                // }
-        
                 exec(dockerExecCmd, (error, stdout, stderr) => {
                     if (error) {
                         console.error('Error compiling/executing:', error);
-                        fs.unlink('code.c', (err) => {
+                        fs.unlink(codeFile, (err) => {
                             if (err) {
-                                console.error('Error deleting code.c:', err);
+                                console.error('Error deleting code file:', err);
                                 return;
                             }
-                            console.log('code.c deleted successfully');
+                            console.log('Code file deleted successfully');
                         });
-            
+    
                         // Remove the Docker container
                         exec(`docker rm -f ${id}`, (error, stdout, stderr) => {
                             if (error) {
@@ -82,37 +98,33 @@ AWS.config.update({
                             }
                             console.log('Docker container removed');
                         });
-
+    
                         res.status(500).send({ error: 'Error compiling/executing', details: stderr });
                         return;
                     }
+    
                     console.log('Code compiled and executed successfully');
                     const s3 = new AWS.S3();
                     const params = {
                         Bucket: 'codeplayground',
-                        Key: `${req.body.email}/${req.body.fname}.c`,
-                        Body: fs.createReadStream('./code.c')
+                        Key: `${req.body.email}/${req.body.fname}.${lang}`,
+                        Body: fs.createReadStream(`./${codeFile}`)
                     };
                     s3.upload(params, (err, data) => {
                         if (err) {
                             console.log('Error uploading file:', err);
                         } else {
-                            
                             console.log('File uploaded successfully. File location:', data.Location);
-                            fs.unlink('code.c', (err) => {
+                            fs.unlink(codeFile, (err) => {
                                 if (err) {
-                                    console.error('Error deleting code.c:', err);
+                                    console.error('Error deleting code file:', err);
                                     return;
                                 }
-                                console.log('code.c deleted successfully');
-                                
+                                console.log('Code file deleted successfully');
                             });
                         }
                     });
-        
-                    // Delete code.c file
-                   
-        
+    
                     // Remove the Docker container
                     exec(`docker rm -f ${id}`, (error, stdout, stderr) => {
                         if (error) {
@@ -121,8 +133,7 @@ AWS.config.update({
                         }
                         console.log('Docker container removed');
                     });
-                    
-        
+    
                     // Send response with stdout data
                     res.status(200).send({ out: stdout });
                 });
@@ -165,7 +176,7 @@ app.get("/getCode",function(req,res){
     const s3 = new AWS.S3();
     const params = {
         Bucket: 'codeplayground',
-        Prefix: `${req.body.email}/` // Assuming email is used as the folder name
+        //Prefix: `${req.params.email}` // Assuming email is used as the folder name
     };
 
     s3.listObjectsV2(params, (err, data) => {
@@ -174,11 +185,60 @@ app.get("/getCode",function(req,res){
             res.status(500).send({ error: 'Error fetching file list', details: err });
         } else {
             // Extract the file names from the data
-            const fileNames = data.Contents.map(file => file.Key);
+            var fileNames = data.Contents.map(file => file.Key);
+            var emailFiles=[]
             console.log('File names:', fileNames);
-            res.status(200).send({ files: fileNames });
+             for (var i=0;i<fileNames.length;i++){
+                    if(fileNames[i].startsWith(req.query.email)){
+                        const splitFileNames=fileNames[i].split("/")
+                        emailFiles.push(splitFileNames[1])
+                    }
+             }
+            res.status(200).send({ files: emailFiles });
         }
     });
+
+})
+app.get('/getCodeValue', function (req, res) {
+    const s3 = new AWS.S3();
+
+    const params = {
+        Bucket: 'codeplayground',
+        Key: `${req.query.email}/${req.query.fname}`,
+    };
+
+    s3.getObject(params, (err, data) => {
+        if (err) {
+            console.error('Error reading from S3:', err);
+            return res.status(500).send({
+                error: 'Error fetching the file',
+                details: err.message,
+            });
+        }
+
+        try {
+            // Convert file content to a string
+            const fileContent = data.Body.toString('utf-8');
+
+            // Send the content as JSON
+            res.json({
+                success: true,
+                content: fileContent,
+            });
+        } catch (conversionError) {
+            console.error('Error processing file content:', conversionError);
+            res.status(500).send({
+                error: 'Error processing file content',
+                details: conversionError.message,
+            });
+        }
+    });
+});
+
+app.post("/codeAi",async function(req,res){
+
+    const result = await model.generateContent([req.body.prompt]);
+    res.send(result.response.text());
 
 })
 app.listen(8000,()=>{

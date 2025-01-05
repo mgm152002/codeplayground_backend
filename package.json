@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.21.0",
     "@types/aws-sdk": "^2.7.0",
     "@types/cors": "^2.8.17",
     "@types/dotenv": "^8.2.0",
