@@ -17,10 +17,7 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-<<<<<<< HEAD
-=======
 
->>>>>>> refs/remotes/origin/main
 # Expose the port the app runs on
 EXPOSE 8000
 
