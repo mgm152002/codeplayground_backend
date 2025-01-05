@@ -1,0 +1,43 @@
+---
+- name: Playbook to install CodePlayground app on Ubuntu
+  hosts: all
+  become: yes
+  gather_facts: yes
+  roles:
+    - geerlingguy.docker
+  tasks:
+    - name: Install Git
+      apt:
+        name: git
+        state: present
+        update_cache: yes
+
+    - name: Clone CodePlayground app
+      git:
+        repo: https://github.com/mgm152002/codeplayground_backend.git
+        dest: /opt/codeplayground
+
+    - name: Copy env file
+      copy:
+        src: .env
+        dest: /opt/codeplayground/.env
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Verify Docker service status
+      command: docker run hello-world
+      register: docker_status
+      failed_when: "'Hello from Docker!' not in docker_status.stdout"
+
+    - name: Build Docker image
+      command: docker build -t codeplayground /opt/codeplayground
+      
+    - name: Build Docker image for compilation
+      command: docker build -t comp /opt/codeplayground/DockerFiles
+
+    - name: Run Docker container
+      command: docker run -d -p 8000:8000 codeplayground

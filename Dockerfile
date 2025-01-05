@@ -1,5 +1,9 @@
-# Use an official Node.js runtime as the base image
-FROM node:18
+
+# Use Docker's official DinD image
+FROM docker:20.10.7-dind
+
+# Install Node.js (if needed)
+RUN apk add --no-cache nodejs npm
 
 # Set the working directory inside the container
 WORKDIR /usr/src/app
@@ -13,8 +17,6 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-# build compilation image
-RUN docker build -t comp DockerFiles
 # Expose the port the app runs on
 EXPOSE 8000
 
