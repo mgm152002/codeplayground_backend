@@ -13,8 +13,7 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-# build compilation image
-RUN docker build -t comp DockerFiles
+
 # Expose the port the app runs on
 EXPOSE 8000
 
