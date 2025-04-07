@@ -58,7 +58,27 @@ AWS.config.update({
         } else if (lang === 'js') {
             codeFile = `code.js`;
             dockerExecCmd = `docker exec ${id} node /usr/src/app/code.js`;
-        } else {
+            
+        
+        }
+        else if(lang === 'go'){
+            codeFile = `code.go`;
+            dockerExecCmd = `docker exec ${id} sh -c "go run code.go"`;
+        }
+        else if (lang === 'rs'){
+            codeFile = `code.rs`;
+            dockerExecCmd = `docker exec ${id} sh -c "rustc code.rs && ./code"`;
+        }
+        // else if(lang === 'java'){
+        //     codeFile = `code.java`;
+        //     dockerExecCmd = `docker exec ${id} sh -c "javac code.java && java code"`;
+
+        // }
+        else if(lang==='cpp'){
+            codeFile = `code.cpp`;
+            dockerExecCmd = `docker exec ${id} sh -c "g++ -o code code.cpp && ./code"`;
+        }
+         else {
             res.status(400).send({ error: 'Unsupported language' });
             return;
         }
@@ -106,7 +126,7 @@ AWS.config.update({
                     console.log('Code compiled and executed successfully');
                     const s3 = new AWS.S3();
                     const params = {
-                        Bucket: 'codeplayground',
+                        Bucket: 'codeplayground12332241242142142421',
                         Key: `${req.body.email}/${req.body.fname}.${lang}`,
                         Body: fs.createReadStream(`./${codeFile}`)
                     };
@@ -175,7 +195,7 @@ app.get("/getCode",function(req,res){
 
     const s3 = new AWS.S3();
     const params = {
-        Bucket: 'codeplayground',
+        Bucket: 'codeplayground12332241242142142421',
         //Prefix: `${req.params.email}` // Assuming email is used as the folder name
     };
 
@@ -203,7 +223,7 @@ app.get('/getCodeValue', function (req, res) {
     const s3 = new AWS.S3();
 
     const params = {
-        Bucket: 'codeplayground',
+        Bucket: 'codeplayground12332241242142142421',
         Key: `${req.query.email}/${req.query.fname}`,
     };
 
