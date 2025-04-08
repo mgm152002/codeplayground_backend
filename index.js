@@ -8,12 +8,16 @@ const { idgen } = require('./id_gen');
 const { spawn } = require('child_process');
 var AWS = require('aws-sdk');
 var cors = require('cors')
+const client = require('prom-client');
+const collectDefaultMetrics = client.collectDefaultMetrics;
 require('aws-sdk/lib/maintenance_mode_message').suppress = true;
 require('dotenv').config()
  
 const app = express()
 app.use(cors())
-
+const Registry = client.Registry;
+const register = new Registry();
+collectDefaultMetrics({ register });
 app.use(body_parser.urlencoded({ extended: true }))
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
@@ -260,6 +264,12 @@ app.post("/codeAi",async function(req,res){
     const result = await model.generateContent([req.body.prompt]);
     res.send(result.response.text());
 
+})
+app.get('/metrics', async (req, res) => {
+    res.set('Content-Type', register.contentType);
+    const metrics = await register.metrics();
+    res.send(metrics);
+  
 })
 app.listen(8000,()=>{
 console.log('listening on 8000')
