@@ -34,6 +34,7 @@ Each code execution is sandboxed using Docker containers:
 - No network access inside containers
 - Short-lived containers — destroyed after execution
 - Read-only filesystem (except temporary code directory)
+- Using gVsior execution environment 
 
 
 
