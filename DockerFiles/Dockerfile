@@ -3,14 +3,16 @@ FROM gcc:latest AS build
 
 # Install system packages and development tools
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     python3 \
     python3-pip \
     nodejs \
     npm \
     golang-go \
     curl \
-    openjdk-17-jdk \
-    build-essential
+    default-jdk \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set Go environment variables
 ENV GOPATH=/go
@@ -25,10 +27,6 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Create Go workspace directories
 RUN mkdir -p $GOPATH/src $GOPATH/bin
-
-# Set Java environment variables
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-ENV PATH=$JAVA_HOME/bin:$PATH
 
 # Set the working directory
 WORKDIR /usr/src/app
